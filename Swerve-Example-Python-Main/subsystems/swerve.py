@@ -4,7 +4,8 @@
 # TODO: Adjust deadbanding and velocity limiting constants
 
 import wpilib
-from constants import *
+import math
+import constants 
 
 class Swerve:
     def __init__(self):
@@ -44,7 +45,7 @@ class SwerveModule:
         self.drive_motor = wpilib.SparkMax(DRIVE_MOTOR_PORTS[module_number], wpilib.MotorType.kBrushless)
         self.steer_motor = wpilib.SparkMax(STEER_MOTOR_PORTS[module_number], wpilib.MotorType.kBrushless)
         self.encoder = wpilib.Encoder(ENCODER_TICKS_PER_REV, ENCODER_GEAR_RATIO)
-        self.gyro = wpilib.ADXRS450_GYRO(GYRO_PORT)
+        self.gyro = wpilib.ADXRS450_Gyro(GYRO_PORT)
 
         # Deadbanding constants
         self.deadband_x = 0.1
@@ -74,7 +75,7 @@ class SwerveModule:
         pass
 
     def teleopPeriodic(self, x, y, rotation):
-        # Apply deadbanding
+        # Apply deadband
         if abs(x) < self.deadband_x:
             x = 0
         if abs(y) < self.deadband_y:
@@ -82,13 +83,17 @@ class SwerveModule:
         if abs(rotation) < self.deadband_rotation:
             rotation = 0
 
-        velocity, angle = self.calculate_swerve(x, y, rotation)
+        # Calculate velocities and angles
+        velocity = math.hypot(x, y)
+        angle = math.atan2(y, x) if x != 0 else 0
+
+        # Limit velocity
+        velocity = min(velocity, self.max_velocity)
+
+        # Calculate motor speeds
         drive_speed, steer_speed = self.calculate_motor_speeds(velocity, angle)
 
-        # Limit motor speeds
-        drive_speed = max(-1.0, min(1.0, drive_speed))
-        steer_speed = max(-1.0, min(1.0, steer_speed))
-
+        # Set motor speeds
         self.drive_motor.set(drive_speed)
         self.steer_motor.set(steer_speed)
 
@@ -97,19 +102,6 @@ class SwerveModule:
 
     def testPeriodic(self):
         pass
-
-    def calculate_swerve(self, x, y, rotation):
-        # Calculate velocity and angle using the joystick input
-        velocity = math.sqrt(x**2 + y**2)
-        angle = math.atan2(y, x)
-
-        # Limit velocity
-        velocity = min(self.max_velocity, velocity)
-
-        # Limit angle
-        angle = max(-self.max_angle, min(self.max_angle, angle))
-
-        return velocity, angle
 
     def calculate_motor_speeds(self, velocity, angle):
         # Calculate drive and steer motor speeds using the velocity and angle
